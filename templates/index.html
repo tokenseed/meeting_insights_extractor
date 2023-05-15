@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Insights Extractorrr</title>
+    <!-- <script src="https://unpkg.com/html2canvas@1.3.3/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.0/jspdf.umd.min.js"></script> -->
+    <script type="module">
+        import { jsPDF } from 'https://cdn.skypack.dev/jspdf@2.5.0';
+        window.jsPDF = jsPDF;
+    </script>      
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.3.3/html2canvas.min.js"></script>
+    <style>
+        .summary-container {
+            font-family: Arial, sans-serif;
+            background-color: white;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            color: #333;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+
+        p {
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .summary-section {
+            margin-bottom: 20px;
+        }
+
+        .summary-heading {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .tldr-box {
+            background-color: #f1f1f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .product-team {
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+
+        .business-development-team {
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Meeting Insights Extractorrr</h1>
+    <form action="/summarize" method="POST">
+        <label for="transcript">Enter meeting transcript:</label><br>
+        <textarea id="transcript" name="transcript" rows="10" cols="50"></textarea><br>
+        <button id="get-summary" onclick="generateSummary()">Get Insights</button>
+    </form>
+
+<div id="loading-message" style="display:none;">
+    <p>Generating summary, please wait...</p>
+    <div class="spinner"></div>
+</div>
+
+<div id="summary-container" class="summary-container" style="display:none;">
+    <div class="summary-section">
+        <div class="summary-heading">TL;DR</div>
+        <div class="tldr-box" id="tldr"></div>
+    </div>
+    <div class="summary-section product-team">
+        <div class="summary-heading">Insights for the Product Team:</div>
+        <div id="product-team-summary"></div>
+    </div>
+    <div class="summary-section business-development-team">
+        <div class="summary-heading">Insights for the Business Development Team:</div>
+        <div id="business-development-team-summary"></div>
+    </div>
+</div>
+
+<button id="download-button" onclick="downloadPDF()" disabled>Download PDF</button>
+
+<script>
+    const form = document.querySelector("form");
+    const summaryContainer = document.getElementById("summary-container");
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+
+        try {
+            console.log("Sending request to /summarize");
+            const response = await fetch("/summarize", {
+               
+                method: "POST",
+            body: formData
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            updateSummary(data);
+            summaryContainer.style.display = "block";
+        } else {
+            const error = await response.json();
+            console.error("Error in JavaScript:", error);
+        }
+    } catch (error) {
+        console.error("Error in JavaScript:", error);
+    }
+});
+
+function updateSummary(data) {
+    // Update TL;DR
+    document.getElementById("tldr").innerHTML = data.tldr;
+
+    // Update Product Team summary
+    var productTeamSummaryHtml = '';
+    for (var i = 0; i < data.product_team.length; i++) {
+        productTeamSummaryHtml += '<p>' + data.product_team[i] + '</p>';
+    }
+    document.getElementById("product-team-summary").innerHTML = productTeamSummaryHtml;
+
+    // Update Business Development Team summary
+    var businessDevelopmentTeamSummaryHtml = '';
+    for (var i = 0; i < data.business_development_team.length; i++) {
+        businessDevelopmentTeamSummaryHtml += '<p>' + data.business_development_team[i] + '</p>';
+    }
+    document.getElementById("business-development-team-summary").innerHTML = businessDevelopmentTeamSummaryHtml;
+}
+
+function generateSummary() {
+    // Show the loading message and spinner
+    document.getElementById("loading-message").style.display = "block";
+
+    var transcript = document.getElementById("transcript").value;
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function () {
+        if (xhttp.readyState == 4) {
+            if (xhttp.status == 200) {
+                var jsonResponse;
+                try {
+                    jsonResponse = JSON.parse(xhttp.responseText);
+                } catch (e) {
+                    console.error("Error in JavaScript:", e.message);
+                    document.getElementById("summary-container").innerHTML = "An error occurred while generating the summary. Please try again.";
+                    document.getElementById("summary-container").style.display = "block";
+                    document.getElementById("loading-message").style.display = "none";
+                    return;
+                }
+
+                updateSummary(jsonResponse);
+
+                document.getElementById("summary-container").style.display = "block";
+                //enable download pdf button
+                document.getElementById("download-button").disabled = false;
+            }
+        }
+    };
+    xhttp.open("POST", "/summarize", true);
+    xhttp.send(new FormData(document.querySelector("form")));
+}
+
+function downloadPDF() {
+    var summaryContainer = document.getElementById("summary-container");
+    html2canvas(summaryContainer).then(function(canvas) {
+        var imgData = canvas.toDataURL('image/png');
+        var pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: [210, 297]
+        });
+
+        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+        pdf.save("meeting-summary.pdf");
+    });
+}
+            
+</script>
+
+</body>
+</html>
